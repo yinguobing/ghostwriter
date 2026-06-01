@@ -119,6 +119,46 @@ def ghost_api_get(path, config):
     return r.json()
 
 
+def ghost_api_post(path, data, config):
+    """POST to Ghost Admin API."""
+    key_id = config["ghost"]["admin_key_id"]
+    key_secret = config["ghost"]["admin_key"]
+    api_url = config["ghost"]["api_url"]
+    token = get_ghost_token(key_id, key_secret)
+    headers = {"Authorization": f"Ghost {token}", "Content-Type": "application/json"}
+    r = requests.post(f"{api_url}{path}",
+                      data=json.dumps(data, ensure_ascii=False).encode("utf-8"),
+                      headers=headers, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def ghost_api_put(path, data, config):
+    """PUT to Ghost Admin API."""
+    key_id = config["ghost"]["admin_key_id"]
+    key_secret = config["ghost"]["admin_key"]
+    api_url = config["ghost"]["api_url"]
+    token = get_ghost_token(key_id, key_secret)
+    headers = {"Authorization": f"Ghost {token}", "Content-Type": "application/json"}
+    r = requests.put(f"{api_url}{path}",
+                     data=json.dumps(data, ensure_ascii=False).encode("utf-8"),
+                     headers=headers, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def ghost_api_delete(path, config):
+    """DELETE from Ghost Admin API."""
+    key_id = config["ghost"]["admin_key_id"]
+    key_secret = config["ghost"]["admin_key"]
+    api_url = config["ghost"]["api_url"]
+    token = get_ghost_token(key_id, key_secret)
+    headers = {"Authorization": f"Ghost {token}"}
+    r = requests.delete(f"{api_url}{path}", headers=headers, timeout=30)
+    r.raise_for_status()
+    return r.json() if r.text else {}
+
+
 def get_ghost_posts(config, limit=20, status="all"):
     return ghost_api_get(f"posts/?limit={limit}&status={status}", config)
 
@@ -708,16 +748,374 @@ def list_posts():
         print(f"{tag} [{p.get('status')}] {p.get('title')} | id={p.get('id')}")
 
 
+# ── Markdown → Ghost Lexical ───────────────────────────────────
+
+_LEXICAL_FORMATS = {1: "bold", 2: "italic", 8: "code"}
+
+
+def _lex_text(text, fmt=0):
+    return {"type": "extended-text", "text": text, "format": fmt,
+            "version": 1, "detail": 0, "style": "", "mode": "normal"}
+
+
+def _lex_link(text, url):
+    return {"type": "link", "url": url,
+            "children": [_lex_text(text)],
+            "format": 0, "version": 1, "detail": 0, "style": "",
+            "mode": "normal", "rel": None, "target": None, "title": None}
+
+
+def _lex_para(children):
+    return {"type": "paragraph", "children": children,
+            "format": "", "indent": 0, "version": 1, "direction": "ltr"}
+
+
+def _lex_heading(tag, children):
+    return {"type": "extended-heading", "tag": tag, "children": children,
+            "format": "", "indent": 0, "version": 1, "direction": "ltr"}
+
+
+def _lex_codeblock(code, lang=""):
+    return {"type": "codeblock", "code": code, "language": lang,
+            "caption": "", "version": 1}
+
+
+def _lex_hr():
+    return {"type": "horizontalrule", "version": 1}
+
+
+def _lex_listitem(children):
+    return {"type": "listitem", "children": children,
+            "format": "", "indent": 0, "value": 1, "version": 1, "direction": "ltr"}
+
+
+def _lex_list(items, ordered=False):
+    return {"type": "list", "listType": "number" if ordered else "bullet",
+            "start": 1, "children": items,
+            "format": "", "indent": 0, "version": 1, "direction": "ltr"}
+
+
+def _lex_html_card(html):
+    return {"type": "html", "html": html, "version": 1}
+
+
+def _extract_fenced_codes(md_text):
+    """提取围栏代码块为占位符, 返回 (处理后的文本, 代码块字典)."""
+    code_map = {}
+    idx = 0
+    def _save(m):
+        nonlocal idx
+        lang = m.group(1) or ""
+        code = m.group(2).rstrip("\n")
+        code_map[f"__CB_{idx}__"] = {"lang": lang, "code": code}
+        r = f"\n__CB_{idx}__\n"
+        idx += 1
+        return r
+    text = re.sub(r'```(\w*)\n(.*?)```', _save, md_text, flags=re.DOTALL)
+    return text, code_map
+
+
+def _parse_inline(text):
+    """解析行内格式: **粗体**, `代码`, *斜体*, [链接](url)."""
+    children = []
+    last = 0
+    for m in re.finditer(r'\*\*(.+?)\*\*|(`[^`]+`)|(\*(.+?)\*)|(\[([^\]]+)\]\(([^)]+)\))', text):
+        s, e = m.start(), m.end()
+        if s > last:
+            children.append(_lex_text(text[last:s]))
+        if m.group(1):       # **bold**
+            children.append(_lex_text(m.group(1), 1))
+        elif m.group(2):     # `code`
+            children.append(_lex_text(m.group(2).strip('`'), 8))
+        elif m.group(3):     # *italic*
+            children.append(_lex_text(m.group(4), 2))
+        elif m.group(5):     # [text](url)
+            children.append(_lex_link(m.group(6), m.group(7)))
+        last = e
+    if last < len(text):
+        children.append(_lex_text(text[last:]))
+    return children if children else [_lex_text("")]
+
+
+def _table_to_html(raw):
+    """Markdown 表格 → HTML table."""
+    rows = [r for r in raw.split('\n') if r.strip()
+            and not re.match(r'^\|[\s:-]+\|', r)]
+    parts = ['<table>']
+    for i, row in enumerate(rows):
+        tag = 'th' if i == 0 else 'td'
+        cells = [c.strip() for c in row.split('|')[1:-1]]
+        parts.append('<tr>')
+        for cell in cells:
+            ch = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', cell)
+            ch = re.sub(r'`([^`]+)`', r'<code>\1</code>', ch)
+            parts.append(f'<{tag}>{ch}</{tag}>')
+        parts.append('</tr>')
+    parts.append('</table>')
+    return '\n'.join(parts)
+
+
+def md_to_ghost_lexical(md_text):
+    """Markdown → Ghost Lexical JSON 字符串.
+
+    支持: 标题, 段落, 代码块(围栏), 表格, 有序/无序列表, 分割线, 行内格式.
+    返回: (title, lexical_json_string)
+    """
+    lines = md_text.split('\n')
+    title = ""
+    if lines and lines[0].startswith('# '):
+        title = lines[0][2:].strip()
+        lines = lines[1:]
+    content = '\n'.join(lines)
+
+    content, code_map = _extract_fenced_codes(content)
+    raw_blocks = re.split(r'\n{2,}', content)
+
+    children = []
+    for raw in raw_blocks:
+        raw = raw.strip()
+        if not raw:
+            continue
+
+        cm = re.match(r'^__CB_(\d+)__$', raw)
+        if cm:
+            cb = code_map.get(raw)
+            if cb:
+                children.append(_lex_codeblock(cb["code"], cb["lang"]))
+            continue
+
+        if re.match(r'^[-*_]{3,}\s*$', raw):
+            children.append(_lex_hr())
+            continue
+
+        hm = re.match(r'^(#{1,6})\s+(.+)$', raw)
+        if hm:
+            children.append(_lex_heading(f"h{len(hm.group(1))}",
+                                          _parse_inline(hm.group(2))))
+            continue
+
+        if '|' in raw and raw.count('|') >= 4:
+            children.append(_lex_html_card(_table_to_html(raw)))
+            continue
+
+        lines_list = raw.split('\n')
+        if all(re.match(r'^(\s*[-*+]\s+|\s*\d+[.)]\s+)', l)
+               for l in lines_list if l.strip()):
+            items, ordered = [], None
+            for line in lines_list:
+                m = re.match(r'^\s*([-*+]|\d+[.)])\s+(.*)$', line)
+                if not m:
+                    continue
+                marker, content_i = m.group(1), m.group(2)
+                is_ordered = (marker.endswith(')') or marker.endswith('.')
+                              or marker.isdigit())
+                if ordered is None:
+                    ordered = bool(is_ordered and marker not in ['-', '*', '+'])
+                items.append(_lex_listitem(_parse_inline(content_i.strip())))
+            if items:
+                children.append(_lex_list(items, ordered or False))
+            continue
+
+        children.append(_lex_para(_parse_inline(raw)))
+
+    lexical_tree = {
+        "root": {
+            "children": children,
+            "direction": None,
+            "format": "",
+            "indent": 0,
+            "type": "root",
+            "version": 1
+        }
+    }
+    return title, json.dumps(lexical_tree, ensure_ascii=False)
+
+
+# ── Publish 命令 ───────────────────────────────────────────────
+
+def get_ghost_authors(config):
+    """Get authors via Ghost Content API (Admin API /authors/ is not available)."""
+    try:
+        # Content API doesn't need auth, just the API key
+        api_url = config["ghost"]["api_url"]
+        r = requests.get(
+            f"{api_url}/ghost/api/content/authors/?limit=50",
+            timeout=10
+        )
+        if r.ok:
+            return r.json()
+    except Exception:
+        pass
+    return {"authors": []}
+
+
+def publish_md_to_ghost(md_path, config,
+                         title=None,
+                         tags=None,
+                         author_slug="xiaohei",
+                         status="published"):
+    """发布 Markdown 文件到 Ghost 博客."""
+    if not os.path.exists(md_path):
+        return False, f"文件不存在: {md_path}"
+
+    with open(md_path, "r", encoding="utf-8") as f:
+        md_text = f.read()
+
+    extracted_title, lexical_json = md_to_ghost_lexical(md_text)
+    if not title:
+        title = extracted_title or os.path.splitext(os.path.basename(md_path))[0]
+    if not title:
+        return False, "无法确定标题，请用 --title 指定"
+
+    # 提取首段作为 excerpt
+    excerpt = ""
+    lex_data = json.loads(lexical_json)
+    for child in lex_data["root"]["children"]:
+        if child.get("type") == "paragraph":
+            texts = [c.get("text", "") for c in child.get("children", [])
+                     if c.get("type") == "extended-text"]
+            excerpt = "".join(texts)[:200]
+            break
+
+    # 查找作者（先 Content API，失败则用已知 ID）
+    author_id = None
+    try:
+        authors_data = get_ghost_authors(config)
+        for a in authors_data.get("authors", []):
+            if a.get("slug") == author_slug:
+                author_id = a["id"]
+                break
+        if not author_id:
+            author_id = authors_data.get("authors", [{}])[0].get("id")
+    except Exception:
+        pass
+    # Fallback: 小黑 (6a183bc8f083c2d9cefca7bc) / 国冰 (69b6b8419d5d7634466cfbd4)
+    if not author_id:
+        author_map = {"xiaohei": "6a183bc8f083c2d9cefca7bc",
+                      "guobing": "69b6b8419d5d7634466cfbd4"}
+        author_id = author_map.get(author_slug)
+    if not author_id:
+        return False, f"无法找到作者: {author_slug}"
+
+    tag_objects = [{"name": t} for t in (tags or [])]
+
+    post_data = {
+        "posts": [{
+            "title": title,
+            "lexical": lexical_json,
+            "status": status,
+            "visibility": "public",
+            "authors": [{"id": author_id}],
+            "tags": tag_objects,
+            "excerpt": excerpt,
+        }]
+    }
+
+    try:
+        result = ghost_api_post("/ghost/api/admin/posts/", post_data, config)
+        post = result.get("posts", [{}])[0]
+        post_url = f"{config['ghost']['api_url']}/{post.get('slug', '')}/"
+        return True, post_url
+    except requests.HTTPError as e:
+        try:
+            detail = e.response.json()
+        except Exception:
+            detail = str(e)
+        return False, f"Ghost API 错误: {detail}"
+
+
+def cmd_publish(args):
+    """处理 publish CLI 命令."""
+    config = load_config()
+
+    md_path = args[0]
+    title = None
+    tags = []
+    author = "xiaohei"
+    status = "published"
+    do_wechat = False
+
+    i = 1
+    while i < len(args):
+        if args[i] == "--title" and i + 1 < len(args):
+            title = args[i + 1]
+            i += 2
+        elif args[i] == "--tags" and i + 1 < len(args):
+            tags = [t.strip() for t in args[i + 1].split(",")]
+            i += 2
+        elif args[i] == "--author" and i + 1 < len(args):
+            author = args[i + 1]
+            i += 2
+        elif args[i] == "--draft":
+            status = "draft"
+            i += 1
+        elif args[i] == "--wechat":
+            do_wechat = True
+            i += 1
+        else:
+            print(f"[!] 未知参数: {args[i]}")
+            return False
+
+    print(f"[*] 发布 {md_path} → Ghost...")
+    success, result = publish_md_to_ghost(
+        md_path, config, title=title, tags=tags,
+        author_slug=author, status=status
+    )
+
+    if success:
+        print(f"[+] ✅ 发布成功: {result}")
+        if do_wechat:
+            print("[*] 开始同步到微信...")
+            slug = result.rstrip("/").split("/")[-1]
+            try:
+                posts_data = ghost_api_get(
+                    f"/ghost/api/admin/posts/?filter=slug:{slug}", config)
+                for p in posts_data.get("posts", []):
+                    if p.get("slug") == slug:
+                        return sync_article(p["id"])
+            except Exception as e:
+                print(f"[!] 微信同步失败: {e}")
+                return False
+        return True
+    else:
+        print(f"[!] ❌ 发布失败: {result}")
+        return False
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法:")
-        print("  python3 sync.py list              - 列出文章")
-        print("  python3 sync.py <article-id>      - 同步到微信草稿")
-        print("  python3 sync.py --preview <id>    - 预览 HTML（不创建草稿）")
+        print("""用法:
+  python3 sync.py list                     - 列出 Ghost 文章
+  python3 sync.py <article-id>             - 同步 Ghost 文章到微信草稿
+  python3 sync.py --preview <id>           - 预览微信 HTML（不创建草稿）
+  python3 sync.py publish <file.md>        - 发布 Markdown 到 Ghost 博客
+      可选参数:
+        --title "标题"       - 指定标题（默认取文件第一个 # 标题）
+        --tags tag1,tag2     - 标签
+        --author slug        - 作者 slug（默认 xiaohei）
+        --draft              - 保存为草稿（默认直接发布）
+        --wechat             - 发布后同步到微信
+
+  示例:
+  python3 sync.py publish article.md
+  python3 sync.py publish article.md --title "我的文章" --tags Ghost,开源 --draft
+  python3 sync.py publish article.md --wechat
+""")
         sys.exit(1)
 
     if sys.argv[1] == "list":
         list_posts()
+    elif sys.argv[1] == "publish":
+        if len(sys.argv) < 3:
+            print("[!] 请指定 Markdown 文件路径")
+            sys.exit(1)
+        try:
+            cmd_publish(sys.argv[2:])
+        except Exception as e:
+            print(f"[!] 错误: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
     elif sys.argv[1] == "--preview" and len(sys.argv) > 2:
         article_id = sys.argv[2]
         try:
