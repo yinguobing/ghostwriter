@@ -15,9 +15,13 @@ markdown → Ghost 博客 → 微信公众号
 ## 安装
 
 ```bash
+# 从 PyPI 安装（推荐）
+pip install ghostwriter
+
+# 或从源码安装（开发模式）
 git clone https://github.com/yinguobing/ghostwriter.git
 cd ghostwriter
-pip install requests PyJWT
+pip install -e ".[dev]"
 ```
 
 ## 配置
@@ -49,39 +53,39 @@ Ghost 后台 → Settings → Advanced → Integrations → Add custom integrati
 ### 列出 Ghost 文章
 
 ```bash
-python3 ghostwriter.py list
+ghostwriter list
 ```
 
 ### 发布 Markdown 到 Ghost
 
 ```bash
 # 直接发布
-python3 ghostwriter.py publish article.md
+ghostwriter publish article.md
 
 # 指定标题和标签
-python3 ghostwriter.py publish article.md --title "我的文章" --tags Ghost,开源
+ghostwriter publish article.md --title "我的文章" --tags Ghost,开源
 
 # 指定作者（slug，默认 xiaohei）
-python3 ghostwriter.py publish article.md --author guobing
+ghostwriter publish article.md --author guobing
 
 # 先存草稿
-python3 ghostwriter.py publish article.md --draft
+ghostwriter publish article.md --draft
 
 # 发布后自动同步到微信
-python3 ghostwriter.py publish article.md --wechat
+ghostwriter publish article.md --wechat
 ```
 
 ### 同步 Ghost 文章到微信草稿
 
 ```bash
 # 先列出文章获取 ID
-python3 ghostwriter.py list
+ghostwriter list
 
 # 同步指定文章
-python3 ghostwriter.py <article-id>
+ghostwriter <article-id>
 
 # 预览 HTML（不创建草稿）
-python3 ghostwriter.py --preview <article-id>
+ghostwriter --preview <article-id>
 ```
 
 ## 管道说明
@@ -113,8 +117,19 @@ python3 ghostwriter.py --preview <article-id>
 
 ```
 ghostwriter/
-├── ghostwriter.py   # 主程序
-└── config.json      # 配置文件（需自行创建）
+├── pyproject.toml          # 项目元数据、构建配置
+├── src/ghostwriter/        # 源码包
+│   ├── cli.py              # CLI 入口与命令分发
+│   ├── config.py           # 配置文件加载
+│   ├── ghost.py            # Ghost Admin API 客户端
+│   ├── wechat.py           # 微信公众号 API 客户端
+│   ├── cleaner.py          # HTML 白名单过滤器
+│   ├── pipeline.py         # Ghost → 微信 HTML 处理管道
+│   ├── lexical.py          # Markdown → Ghost Lexical 转换器
+│   └── normalize.py        # Unicode 标题规范化
+├── tests/                  # 单元测试（pytest）
+├── config.json             # 配置文件（需自行创建）
+└── docs/                   # 项目页面
 ```
 
 ## 注意事项
