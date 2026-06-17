@@ -26,24 +26,36 @@ pip install -e ".[dev]"
 
 ## 配置
 
-创建 `config.json`：
+支持两种配置方式（环境变量优先）：
 
-```json
-{
-  "wechat": {
-    "appid": "your_wechat_appid",
-    "secret": "your_wechat_secret"
-  },
-  "ghost": {
-    "api_url": "https://yinguobing.com",
-    "admin_key_id": "your_ghost_admin_key_id",
-    "admin_key": "your_ghost_admin_key_secret"
-  }
-}
+### 方式 1：环境变量（推荐用于 CI/Docker）
+
+```bash
+export GHOSTWRITER_GHOST_API_URL="https://yinguobing.com"
+export GHOSTWRITER_GHOST_ADMIN_KEY_ID="your_key_id"
+export GHOSTWRITER_GHOST_ADMIN_KEY="your_hex_secret"
+export GHOSTWRITER_WECHAT_APPID="your_wechat_appid"
+export GHOSTWRITER_WECHAT_SECRET="your_wechat_secret"
 ```
 
+### 方式 2：配置文件（适合本地使用）
+
+```bash
+# 交互式设置
+ghostwriter config set ghost.api_url https://yinguobing.com
+ghostwriter config set ghost.admin_key_id your_key_id
+ghostwriter config set ghost.admin_key your_hex_secret
+ghostwriter config set wechat.appid your_wechat_appid
+ghostwriter config set wechat.secret your_wechat_secret
+
+# 查看当前配置（密钥已脱敏）
+ghostwriter config
+```
+
+配置文件保存在 `~/.config/ghostwriter/config.json`。
+
 **Ghost Admin API Key 获取：**
-Ghost 后台 → Settings → Advanced → Integrations → Add custom integration → 复制 `Admin API Key`（格式为 `key_id:hex_secret`，在 config 中拆成两段填入）
+Ghost 后台 → Settings → Advanced → Integrations → Add custom integration → 复制 `Admin API Key`（格式为 `key_id:hex_secret`，拆成两段填入）
 
 **微信 AppID/Secret 获取：**
 [微信公众平台](https://mp.weixin.qq.com) → 设置与开发 → 基本配置

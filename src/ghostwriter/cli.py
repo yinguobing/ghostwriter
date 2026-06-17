@@ -12,7 +12,7 @@ import sys
 
 import requests
 
-from .config import load_config
+from .config import load_config, set_config_value, show_config, config_path
 from .ghost import (
     ghost_api_get,
     ghost_api_post,
@@ -378,6 +378,35 @@ def _cmd_publish(args):
         return False
 
 
+# ── Config ───────────────────────────────────────────────────
+
+def _cmd_config(args):
+    """Handle `ghostwriter config` subcommand."""
+    if not args or args[0] in ("show",):
+        show_config()
+    elif args[0] == "set" and len(args) >= 3:
+        set_config_value(args[1], " ".join(args[2:]))
+    elif args[0] == "path":
+        print(config_path())
+    elif args[0] in ("--help", "-h", "help"):
+        print("""config 用法:
+  ghostwriter config                显示当前配置（密钥已脱敏）
+  ghostwriter config set <key> <value>
+                                    设置单个配置项
+  ghostwriter config path           显示配置文件路径
+
+  有效的 <key>:
+    ghost.api_url          Ghost 博客地址
+    ghost.admin_key_id     Ghost Admin API Key ID
+    ghost.admin_key        Ghost Admin API Key Secret
+    wechat.appid           微信公众号 AppID
+    wechat.secret          微信公众号 AppSecret
+""")
+    else:
+        print(f"[!] 未知的 config 子命令: {' '.join(args)}")
+        print("[!] 使用 'ghostwriter config --help' 查看用法")
+
+
 # ── Main ─────────────────────────────────────────────────────
 
 def main(args=None):
@@ -391,10 +420,11 @@ def main(args=None):
 
     if not args or args[0] in ("--help", "-h", "help"):
         print("""用法:
-  python3 ghostwriter.py list                     - 列出 Ghost 文章
-  python3 ghostwriter.py <article-id>             - 同步 Ghost 文章到微信草稿
-  python3 ghostwriter.py --preview <id>           - 预览微信 HTML（不创建草稿）
-  python3 ghostwriter.py publish <file.md>        - 发布 Markdown 到 Ghost 博客
+  ghostwriter list                     - 列出 Ghost 文章
+  ghostwriter <article-id>             - 同步 Ghost 文章到微信草稿
+  ghostwriter --preview <id>           - 预览微信 HTML（不创建草稿）
+  ghostwriter publish <file.md>        - 发布 Markdown 到 Ghost 博客
+  ghostwriter config                   - 查看/设置配置
       可选参数:
         --title "标题"       - 指定标题（默认取文件第一个 # 标题）
         --slug "my-slug"     - 指定 slug（默认从标题自动生成）
@@ -413,6 +443,8 @@ def main(args=None):
 
     if args[0] == "list":
         list_posts()
+    elif args[0] == "config":
+        _cmd_config(args[1:])
     elif args[0] == "publish":
         if len(args) < 2:
             print("[!] 请指定 Markdown 文件路径")
