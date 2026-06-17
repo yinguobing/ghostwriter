@@ -140,10 +140,14 @@ def sync_article(article_id, preview_only=False):
 
 # ── List posts ───────────────────────────────────────────────
 
-def list_posts():
-    """List Ghost posts via the Admin API."""
+def list_posts(limit=20):
+    """List Ghost posts via the Admin API.
+
+    Args:
+        limit: Max number of posts to show (default 20, use 'all' for unlimited).
+    """
     config = load_config()
-    data = get_ghost_posts(config, limit=20, status="all")
+    data = get_ghost_posts(config, limit=limit, status="all")
     posts = data.get("posts", [])
     print(f"共 {len(posts)} 篇:\n")
     for p in posts:
@@ -420,7 +424,7 @@ def main(args=None):
 
     if not args or args[0] in ("--help", "-h", "help"):
         print("""用法:
-  ghostwriter list                     - 列出 Ghost 文章
+  ghostwriter list [--limit <n>|all]   - 列出 Ghost 文章
   ghostwriter <article-id>             - 同步 Ghost 文章到微信草稿
   ghostwriter --preview <id>           - 预览微信 HTML（不创建草稿）
   ghostwriter publish <file.md>        - 发布 Markdown 到 Ghost 博客
@@ -442,7 +446,10 @@ def main(args=None):
         sys.exit(1)
 
     if args[0] == "list":
-        list_posts()
+        limit = 20
+        if len(args) > 1 and args[1] == "--limit" and len(args) > 2:
+            limit = args[2]
+        list_posts(limit=limit)
     elif args[0] == "config":
         _cmd_config(args[1:])
     elif args[0] == "publish":

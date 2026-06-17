@@ -82,9 +82,17 @@ def upload_image_to_ghost(config, image_path):
     token = get_ghost_token(key_id, key_secret)
 
     with open(image_path, "rb") as f:
+        # Detect MIME type from file extension
+        ext = os.path.splitext(image_path)[1].lower()
+        mime_map = {
+            ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+            ".png": "image/png", ".gif": "image/gif",
+            ".webp": "image/webp",
+        }
+        content_type = mime_map.get(ext, "image/png")
         r = requests.post(
             f"{api_url}/ghost/api/admin/images/upload/",
-            files={"file": (os.path.basename(image_path), f, "image/png")},
+            files={"file": (os.path.basename(image_path), f, content_type)},
             headers={"Authorization": f"Ghost {token}"},
             timeout=60,
         )
