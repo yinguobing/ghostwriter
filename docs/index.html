@@ -541,29 +541,38 @@
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
         <span style="margin-left:8px">terminal</span>
       </div>
-      <pre>git clone https://github.com/yinguobing/ghostwriter.git
+      <pre><span class="cm"># 从 PyPI 安装（推荐）</span>
+pip install ghostwriter-cli
+
+<span class="cm"># 或从源码安装</span>
+git clone https://github.com/yinguobing/ghostwriter.git
 cd ghostwriter
-pip install requests PyJWT</pre>
+pip install -e <span class="str">".[dev]"</span></pre>
     </div>
 
     <h3>配置</h3>
-    <p>创建 <code>config.json</code>，填入微信公众号和 Ghost 的 API 密钥：</p>
+    <p>支持环境变量（CI/Docker 首选）或配置文件两种方式：</p>
     <div class="code-block">
       <div class="code-header">
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-        <span style="margin-left:8px">config.json</span>
+        <span style="margin-left:8px">terminal</span>
       </div>
-      <pre>{
-  <span class="str">"wechat"</span>: {
-    <span class="str">"appid"</span>: <span class="str">"your_wechat_appid"</span>,
-    <span class="str">"secret"</span>: <span class="str">"your_wechat_secret"</span>
-  },
-  <span class="str">"ghost"</span>: {
-    <span class="str">"api_url"</span>: <span class="str">"https://yinguobing.com"</span>,
-    <span class="str">"admin_key_id"</span>: <span class="str">"your_key_id"</span>,
-    <span class="str">"admin_key"</span>: <span class="str">"your_hex_secret"</span>
-  }
-}</pre>
+      <pre><span class="cm"># 方式 1：环境变量（CI/Docker 首选）</span>
+<span class="kw">export</span> GHOSTWRITER_GHOST_API_URL=<span class="str">"https://yinguobing.com"</span>
+<span class="kw">export</span> GHOSTWRITER_GHOST_ADMIN_KEY_ID=<span class="str">"your_key_id"</span>
+<span class="kw">export</span> GHOSTWRITER_GHOST_ADMIN_KEY=<span class="str">"your_hex_secret"</span>
+<span class="kw">export</span> GHOSTWRITER_WECHAT_APPID=<span class="str">"your_wechat_appid"</span>
+<span class="kw">export</span> GHOSTWRITER_WECHAT_SECRET=<span class="str">"your_wechat_secret"</span>
+
+<span class="cm"># 方式 2：CLI 交互式配置</span>
+ghostwriter config set ghost.api_url https://yinguobing.com
+ghostwriter config set ghost.admin_key_id your_key_id
+ghostwriter config set ghost.admin_key your_hex_secret
+ghostwriter config set wechat.appid your_wechat_appid
+ghostwriter config set wechat.secret your_wechat_secret
+
+<span class="cm"># 查看当前配置（密钥已脱敏）</span>
+ghostwriter config</pre>
     </div>
 
     <h3>使用</h3>
@@ -573,19 +582,19 @@ pip install requests PyJWT</pre>
         <span style="margin-left:8px">terminal</span>
       </div>
       <pre><span class="cm"># 列出 Ghost 文章</span>
-python3 ghostwriter.py list
+ghostwriter list
 
 <span class="cm"># 发布 Markdown 到 Ghost</span>
-python3 ghostwriter.py publish article.md
+ghostwriter publish article.md
 
 <span class="cm"># 同步到微信草稿</span>
-python3 ghostwriter.py &lt;article-id&gt;
-
-<span class="cm"># 一键发布 + 同步</span>
-python3 ghostwriter.py publish article.md --wechat
+ghostwriter sync &lt;article-id&gt;
 
 <span class="cm"># 预览 HTML（不创建草稿）</span>
-python3 ghostwriter.py --preview &lt;article-id&gt;</pre>
+ghostwriter sync --preview &lt;article-id&gt;
+
+<span class="cm"># 一键发布 + 同步</span>
+ghostwriter publish article.md --wechat</pre>
     </div>
   </section>
 
