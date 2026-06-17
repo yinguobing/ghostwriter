@@ -9,6 +9,9 @@ ghostwriter is a Python CLI that implements a **Markdown → Ghost → WeChat** 
 ## Commands
 
 ```bash
+# Install (from PyPI)
+pip install ghostwriter-cli
+
 # Install (editable, with dev deps)
 pip install -e ".[dev]"
 

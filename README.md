@@ -16,7 +16,7 @@ markdown → Ghost 博客 → 微信公众号
 
 ```bash
 # 从 PyPI 安装（推荐）
-pip install ghostwriter
+pip install ghostwriter-cli
 
 # 或从源码安装（开发模式）
 git clone https://github.com/yinguobing/ghostwriter.git
