@@ -57,8 +57,7 @@ ghostwriter config
 可选字段：
 ```bash
 # 作者映射（Ghost Content API 不可用时的离线回退）
-ghostwriter config set authors.xiaohei 6a183bc8f083c2d9cefca7bc
-ghostwriter config set authors.guobing 69b6b8419d5d7634466cfbd4
+ghostwriter config set authors.<slug> <ghost_author_id>
 ```
 
 **Ghost Admin API Key 获取：**
