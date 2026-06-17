@@ -31,7 +31,7 @@ pip install -e ".[dev]"
 ### 方式 1：环境变量（推荐用于 CI/Docker）
 
 ```bash
-export GHOSTWRITER_GHOST_API_URL="https://yinguobing.com"
+export GHOSTWRITER_GHOST_API_URL="https://your-ghost-blog.com"
 export GHOSTWRITER_GHOST_ADMIN_KEY_ID="your_key_id"
 export GHOSTWRITER_GHOST_ADMIN_KEY="your_hex_secret"
 export GHOSTWRITER_WECHAT_APPID="your_wechat_appid"
@@ -42,7 +42,7 @@ export GHOSTWRITER_WECHAT_SECRET="your_wechat_secret"
 
 ```bash
 # 交互式设置
-ghostwriter config set ghost.api_url https://yinguobing.com
+ghostwriter config set ghost.api_url https://your-ghost-blog.com
 ghostwriter config set ghost.admin_key_id your_key_id
 ghostwriter config set ghost.admin_key your_hex_secret
 ghostwriter config set wechat.appid your_wechat_appid
