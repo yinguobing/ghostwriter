@@ -223,13 +223,10 @@ def publish_md_to_ghost(md_path, config,
             author_id = authors_data.get("authors", [{}])[0].get("id")
     except Exception:
         pass
-    # Fallback: known author IDs for this Ghost instance
+    # Fallback: authors map from config file
     if not author_id:
-        author_map = {
-            "xiaohei": "6a183bc8f083c2d9cefca7bc",
-            "guobing": "69b6b8419d5d7634466cfbd4",
-        }
-        author_id = author_map.get(author_slug)
+        authors_map = config.get("authors", {})
+        author_id = authors_map.get(author_slug)
     if not author_id:
         return False, f"无法找到作者: {author_slug}"
 
@@ -405,6 +402,7 @@ def _cmd_config(args):
     ghost.admin_key        Ghost Admin API Key Secret
     wechat.appid           微信公众号 AppID
     wechat.secret          微信公众号 AppSecret
+    authors.<slug>         (可选) 作者 slug → Ghost 作者 ID 映射
 """)
     else:
         print(f"[!] 未知的 config 子命令: {' '.join(args)}")

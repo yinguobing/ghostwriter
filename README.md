@@ -54,6 +54,13 @@ ghostwriter config
 
 配置文件保存在 `~/.config/ghostwriter/config.json`。
 
+可选字段：
+```bash
+# 作者映射（Ghost Content API 不可用时的离线回退）
+ghostwriter config set authors.xiaohei 6a183bc8f083c2d9cefca7bc
+ghostwriter config set authors.guobing 69b6b8419d5d7634466cfbd4
+```
+
 **Ghost Admin API Key 获取：**
 Ghost 后台 → Settings → Advanced → Integrations → Add custom integration → 复制 `Admin API Key`（格式为 `key_id:hex_secret`，拆成两段填入）
 

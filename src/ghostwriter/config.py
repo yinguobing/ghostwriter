@@ -203,6 +203,13 @@ def show_config():
             value = "(未设置)"
         print(f"  {key_path} = {value}")
 
+    # Show optional authors map
+    authors = config.get("authors", {})
+    if authors:
+        print("")
+        for slug, author_id in authors.items():
+            print(f"  authors.{slug} = {author_id}")
+
 
 def set_config_value(key_path, value):
     """Write a single key to the config file.
@@ -210,8 +217,9 @@ def set_config_value(key_path, value):
     Creates the config directory and file if they don't exist.
     Preserves any existing keys in the file.
     """
-    if key_path not in _REQUIRED_KEYS:
+    if key_path not in _REQUIRED_KEYS and not key_path.startswith("authors."):
         valid = "\n".join(f"  {k}" for k in _REQUIRED_KEYS)
+        valid += "\n  authors.<slug>     (可选) 作者 slug → ID 映射"
         print(f"[!] 未知的配置键: {key_path}")
         print(f"有效的键:\n{valid}")
         sys.exit(1)
