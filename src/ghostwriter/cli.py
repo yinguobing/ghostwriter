@@ -44,17 +44,11 @@ def sync_article(article_id, preview_only=False):
         True on success, False on failure.
     """
     config = load_config()
-    wc = config["wechat"]
 
     action = "预览" if preview_only else "同步"
     print(f"[*] 开始{action} Ghost 文章 {article_id} → 微信草稿")
 
-    # 1. Get WeChat token
-    print("[*] 获取微信 access_token...")
-    token = get_wechat_token(wc["appid"], wc["secret"])
-    print(f"[+] token: {token[:20]}...")
-
-    # 2. Get Ghost article
+    # 1. Get Ghost article
     print("[*] 获取 Ghost 文章...")
     ghost_data = get_ghost_article(article_id, config)
     posts = ghost_data.get("posts", [])
@@ -74,38 +68,48 @@ def sync_article(article_id, preview_only=False):
     print(f"[+] 标题: {title}")
     print(f"[+] 状态: {article.get('status')}")
 
-    # Author field: max 8 bytes for WeChat
-    author_for_wechat = "国冰"
-    if author and len(author.encode("utf-8")) <= 8:
-        author_for_wechat = author
+    # In preview mode, skip all WeChat API calls
+    if not preview_only:
+        wc = config["wechat"]
+        print("[*] 获取微信 access_token...")
+        token = get_wechat_token(wc["appid"], wc["secret"])
+        print(f"[+] token: {token[:20]}...")
 
-    # 3. Upload cover image (permanent material)
-    thumb_media_id = ""
-    if feature_image:
-        print(f"[*] 上传封面图（永久素材）...")
-        thumb_media_id, _ = upload_permanent_material(token, feature_image)
-        if thumb_media_id:
-            print(f"[+] 封面图 media_id: {thumb_media_id}")
-        else:
-            print(f"[!] 封面上传失败，将创建无封面草稿")
+        # Author field: max 8 bytes for WeChat
+        author_for_wechat = "国冰"
+        if author and len(author.encode("utf-8")) <= 8:
+            author_for_wechat = author
 
-    # 4. Extract and upload content images
-    images = extract_images(html_content)
-    image_map = {}
-    if images:
-        print(f"[*] 发现 {len(images)} 张内容图片，开始上传...")
-        for img_url in images:
-            media_id, wechat_url = upload_permanent_material(token, img_url)
-            if wechat_url:
-                image_map[img_url] = wechat_url
-                print(
-                    f"  [+] {img_url[:60]}... → {wechat_url[:60]}..."
-                )
+        # Upload cover image (permanent material)
+        thumb_media_id = ""
+        if feature_image:
+            print(f"[*] 上传封面图（永久素材）...")
+            thumb_media_id, _ = upload_permanent_material(token, feature_image)
+            if thumb_media_id:
+                print(f"[+] 封面图 media_id: {thumb_media_id}")
+            else:
+                print(f"[!] 封面上传失败，将创建无封面草稿")
 
-    # 5. Run HTML processing pipeline
+        # Extract and upload content images
+        images = extract_images(html_content)
+        image_map = {}
+        if images:
+            print(f"[*] 发现 {len(images)} 张内容图片，开始上传...")
+            for img_url in images:
+                media_id, wechat_url = upload_permanent_material(token, img_url)
+                if wechat_url:
+                    image_map[img_url] = wechat_url
+                    print(f"  [+] {img_url[:60]}... → {wechat_url[:60]}...")
+    else:
+        # Preview: no WeChat token needed, keep original image URLs
+        author_for_wechat = author if author else "国冰"
+        thumb_media_id = ""
+        image_map = {}
+
+    # Run HTML processing pipeline
     final_html = process_html(html_content, image_map)
 
-    # 6. Output result
+    # Output result
     print(
         f"[*] 标题字节: {len(title.encode('utf-8'))} | "
         f"作者: {author_for_wechat!r}"
