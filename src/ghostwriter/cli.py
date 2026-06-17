@@ -425,23 +425,26 @@ def main(args=None):
     if not args or args[0] in ("--help", "-h", "help"):
         print("""用法:
   ghostwriter list [--limit <n>|all]   - 列出 Ghost 文章
-  ghostwriter <article-id>             - 同步 Ghost 文章到微信草稿
-  ghostwriter --preview <id>           - 预览微信 HTML（不创建草稿）
+  ghostwriter sync <article-id>        - 同步 Ghost 文章到微信草稿
+  ghostwriter sync --preview <id>      - 预览微信 HTML（不创建草稿）
   ghostwriter publish <file.md>        - 发布 Markdown 到 Ghost 博客
   ghostwriter config                   - 查看/设置配置
-      可选参数:
-        --title "标题"       - 指定标题（默认取文件第一个 # 标题）
-        --slug "my-slug"     - 指定 slug（默认从标题自动生成）
-        --cover "image.jpg"  - 封面图片路径（本地文件，自动上传）
-        --tags tag1,tag2     - 标签
-        --author slug        - 作者 slug（默认 xiaohei）
-        --draft              - 保存为草稿（默认直接发布）
-        --wechat             - 发布后同步到微信
+
+  publish 选项:
+    --title "标题"       - 指定标题（默认取文件第一个 # 标题）
+    --slug "my-slug"     - 指定 slug（默认从标题自动生成）
+    --cover "image.jpg"  - 封面图片路径（本地文件，自动上传）
+    --tags tag1,tag2     - 标签
+    --author slug        - 作者 slug（默认 xiaohei）
+    --draft              - 保存为草稿（默认直接发布）
+    --wechat             - 发布后同步到微信
 
   示例:
-  python3 ghostwriter.py publish article.md
-  python3 ghostwriter.py publish article.md --title "我的文章" --slug my-article --cover cover.png --tags Ghost,开源 --draft
-  python3 ghostwriter.py publish article.md --wechat
+  ghostwriter publish article.md
+  ghostwriter publish article.md --title "我的文章" --slug my-article --cover cover.png --tags Ghost,开源 --draft
+  ghostwriter publish article.md --wechat
+  ghostwriter sync 123abc
+  ghostwriter sync --preview 123abc
 """)
         sys.exit(1)
 
@@ -463,24 +466,36 @@ def main(args=None):
             import traceback
             traceback.print_exc()
             sys.exit(1)
-    elif args[0] == "--preview" and len(args) > 1:
-        article_id = args[1]
+    elif args[0] == "sync":
+        preview_only = False
+        article_id = None
+        i = 1
+        while i < len(args):
+            if args[i] == "--preview" and i + 1 < len(args):
+                preview_only = True
+                article_id = args[i + 1]
+                i += 2
+            elif not args[i].startswith("--"):
+                article_id = args[i]
+                i += 1
+            else:
+                print(f"[!] 未知参数: {args[i]}")
+                sys.exit(1)
+        if not article_id:
+            print("[!] 请指定文章 ID")
+            print("[!] 用法: ghostwriter sync [--preview] <article-id>")
+            sys.exit(1)
         try:
-            sync_article(article_id, preview_only=True)
+            sync_article(article_id, preview_only=preview_only)
         except Exception as e:
             print(f"[!] 错误: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
     else:
-        article_id = args[0]
-        try:
-            sync_article(article_id)
-        except Exception as e:
-            print(f"[!] 错误: {e}")
-            import traceback
-            traceback.print_exc()
-            sys.exit(1)
+        print(f"[!] 未知命令: {args[0]}")
+        print("[!] 使用 --help 查看可用命令")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
