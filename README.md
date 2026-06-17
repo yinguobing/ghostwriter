@@ -139,8 +139,7 @@ ghostwriter/
 │   ├── pipeline.py         # Ghost → 微信 HTML 处理管道
 │   ├── lexical.py          # Markdown → Ghost Lexical 转换器
 │   └── normalize.py        # Unicode 标题规范化
-├── tests/                  # 单元测试（pytest）
-├── config.json             # 配置文件（需自行创建）
+├── tests/                  # 单元测试（pytest，74个）
 └── docs/                   # 项目页面
 ```
 
