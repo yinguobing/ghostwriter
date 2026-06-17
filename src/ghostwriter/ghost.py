@@ -43,7 +43,7 @@ def _api_request(method, path, config, data=None):
         kwargs["headers"]["Content-Type"] = "application/json"
         kwargs["data"] = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
-    url = f"{api_url}{path}"
+    url = f"{api_url.rstrip('/')}/{path.lstrip('/')}"
     r = requests.request(method, url, **kwargs)
     r.raise_for_status()
     return r.json() if r.text else {}
@@ -95,12 +95,12 @@ def upload_image_to_ghost(config, image_path):
 
 def get_ghost_posts(config, limit=20, status="all"):
     """List Ghost posts via Admin API."""
-    return ghost_api_get(f"posts/?limit={limit}&status={status}", config)
+    return ghost_api_get(f"/ghost/api/admin/posts/?limit={limit}&status={status}", config)
 
 
 def get_ghost_article(article_id, config):
     """Fetch a single Ghost article with HTML rendering."""
-    return ghost_api_get(f"posts/{article_id}/?formats=html", config)
+    return ghost_api_get(f"/ghost/api/admin/posts/{article_id}/?formats=html", config)
 
 
 def get_ghost_authors(config):
