@@ -93,6 +93,20 @@ def restore_code_blocks(html):
 
 # ── Element transformers ─────────────────────────────────────
 
+def convert_figure_div(html):
+    """Convert <figure> to <div> and <figcaption> to <p>.
+
+    Ghost uses <figure> to wrap images (image cards, bookmark cards),
+    but WeChat's whitelist doesn't include <figure> or <figcaption>.
+    Without this conversion, all images inside <figure> get stripped.
+    """
+    html = re.sub(r'<figure(\s[^>]*)>', r'<div\1>', html)
+    html = re.sub(r'</figure>', '</div>', html)
+    html = re.sub(r'<figcaption>', '<p>', html)
+    html = re.sub(r'</figcaption>', '</p>', html)
+    return html
+
+
 def convert_hr(html):
     """Convert <hr> to a styled divider <div>."""
     return re.sub(
@@ -320,18 +334,19 @@ def process_html(html_content, image_map):
     Pipeline stages (order is critical):
      1. Replace image URLs with WeChat CDN URLs
      2. Remove Ghost-specific HTML comments (<!--kg-card-*-->)
-     3. Convert <hr> to styled <div> (before whitelist filter)
-     4. Convert <table> to inline-block layout (before whitelist filter)
-     5. Protect code blocks with placeholders
-     6. Three-level whitelist filter (tags → attrs → styles)
-     7. Restore code blocks with WeChat-safe styling
-     8. Apply default styles (headings, code, blockquote)
-     9. Flatten nested blockquotes
-    10. Add paragraph spacing
-    11. Add image spacing
-    12. Convert links to text [url] format
-    13. Convert ordered lists to numbered <p>
-    14. Convert unordered lists to bulleted <p>
+     3. Convert <figure>/<figcaption> to <div>/<p> (before whitelist)
+     4. Convert <hr> to styled <div> (before whitelist filter)
+     5. Convert <table> to inline-block layout (before whitelist filter)
+     6. Protect code blocks with placeholders
+     7. Three-level whitelist filter (tags → attrs → styles)
+     8. Restore code blocks with WeChat-safe styling
+     9. Apply default styles (headings, code, blockquote)
+    10. Flatten nested blockquotes
+    11. Add paragraph spacing
+    12. Add image spacing
+    13. Convert links to text [url] format
+    14. Convert ordered lists to numbered <p>
+    15. Convert unordered lists to bulleted <p>
 
     Returns HTML suitable for WeChat draft creation.
     """
@@ -341,46 +356,49 @@ def process_html(html_content, image_map):
     # 2. Remove Ghost comments
     html = clean_ghost_comments(html)
 
-    # 3. Convert <hr> (before whitelist — <hr> not in safe tags)
+    # 3. Convert <figure>/<figcaption> (before whitelist — not in safe tags)
+    html = convert_figure_div(html)
+
+    # 4. Convert <hr> (before whitelist — <hr> not in safe tags)
     html = convert_hr(html)
 
-    # 4. Convert <table> (before whitelist — <table> not in safe tags)
+    # 5. Convert <table> (before whitelist — <table> not in safe tags)
     html = convert_table_to_div(html)
 
-    # 5. Protect code blocks
+    # 6. Protect code blocks
     html = convert_code_blocks(html)
 
-    # 6. Three-level whitelist filter
+    # 7. Three-level whitelist filter
     html = clean_html_for_wechat(html)
 
-    # 7. Restore code blocks
+    # 8. Restore code blocks
     html = restore_code_blocks(html)
 
-    # 8. Default styles
+    # 9. Default styles
     html = apply_wechat_styles(html)
 
-    # 9. Flatten nested blockquotes
+    # 10. Flatten nested blockquotes
     html = flatten_nested_blockquotes(html)
 
-    # 10. Paragraph spacing
+    # 11. Paragraph spacing
     html = re.sub(
         r'<p\b(?!\s+[^>]*style=)([^>]*)>',
         r'<p style="margin-bottom: 16px;">', html,
     )
 
-    # 11. Image spacing
+    # 12. Image spacing
     html = re.sub(
         r'<img([^>]*)>',
         r'<img style="margin-bottom: 16px;"\1>', html,
     )
 
-    # 12. Links → text [url]
+    # 13. Links → text [url]
     html = convert_links(html)
 
-    # 13. Ordered lists → numbered <p>
+    # 14. Ordered lists → numbered <p>
     html = convert_ordered_list(html)
 
-    # 14. Unordered lists → bullet <p>
+    # 15. Unordered lists → bullet <p>
     html = convert_unordered_list(html)
 
     return html
